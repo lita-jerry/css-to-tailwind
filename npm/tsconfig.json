@@ -2,7 +2,8 @@
   "compilerOptions": {
     "target": "es2015",
     "lib": ["esnext"],
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "declaration": true,
     "strict": true,
@@ -11,5 +12,5 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true
   },
-  "include": ["./CssToTailwindTranslator.ts"]
+  "include": ["./CssToTailwindTranslator.ts", "./test.ts"]
 }

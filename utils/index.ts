@@ -91,6 +91,39 @@ export const copyText = (str: string) => {
   document.body.removeChild(fakeElement)
 }
 
+const WRAPPER_TAG_RE = /^[a-z][a-z0-9-]*$/
+
+export const isValidWrapperTag = (tag: string | undefined) => {
+  const t = (tag ?? '').trim().toLowerCase()
+  return t.length > 0 && WRAPPER_TAG_RE.test(t)
+}
+
+export const formatClassWithDomWrapper = (classStr: string, wrapperTag: string | undefined) => {
+  if (!isValidWrapperTag(wrapperTag)) {
+    return classStr
+  }
+  const tag = (wrapperTag ?? '').trim().toLowerCase()
+  const escaped = classStr
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+  return `<${tag} class="${escaped}"></${tag}>`
+}
+
+export const normalizeCssInputForTranslator = (input: string) => {
+  const trimmed = input.trim()
+  if (trimmed === '') {
+    return input
+  }
+  if (trimmed.includes('{') || trimmed.includes('}')) {
+    return input
+  }
+  if (!/:\s*/.test(trimmed)) {
+    return input
+  }
+  return `.__inline__ { ${trimmed} }`
+}
+
 export const getDemoArray = (str: string) => {
   const attributeVals: string[] = []
   str = str.replace(/:\s*(([^\s^;^{]+\s*)+);/g, (v, $1: string) => {

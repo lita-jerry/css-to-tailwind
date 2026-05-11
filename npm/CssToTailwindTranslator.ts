@@ -14,7 +14,32 @@ let useAllDefaultValues = false
 let customTheme: CustomTheme = {}
 
 const hasNegative = (val: string): ['-' | '', string] => [val[0] === '-' ? '-' : '', val[0] === '-' ? val.slice(1) : val]
+
+/**
+ * Collapses decorative whitespace around commas and parentheses so fewer `_`
+ * placeholders are needed. Remaining spaces (e.g. between a color and `0%`)
+ * are still turned into `_` by {@link getCustomVal}, which matches Tailwind's
+ * arbitrary-value rule: underscores in class names become spaces at build time.
+ * @see https://tailwindcss.com/docs/adding-custom-styles#handling-whitespace
+ */
+const minifyCssGradientLikeWhitespace = (val: string): string => {
+  let v = val.trim()
+  v = v.replace(/\s*,\s*/g, ',')
+  v = v.replace(/\s*\(\s*/g, '(')
+  v = v.replace(/\s*\)\s*/g, ')')
+  v = v.replace(/\s{2,}/g, ' ')
+  return v.trim()
+}
+
+/** Only values that are a single gradient() — avoids breaking rgba(,,,) etc. in mixed backgrounds */
+const isPureGradientCssValue = (val: string) =>
+  /^(?:linear|radial|repeating-linear|conic)-gradient\s*\(/i.test(val.trim())
+
 const getCustomVal = (val: string) => {
+  val = val.trim()
+  if (isPureGradientCssValue(val)) {
+    val = minifyCssGradientLikeWhitespace(val)
+  }
   val = val.replace(/\s/g, '_')
   for (let index = 1; index < val.length; index) {
     const char = val[index]
@@ -2040,6 +2065,77 @@ const parsingCode = (code: string): CssCodeParse[] => {
   }))
 }
 
+/** Inner values that must keep `[]` (excluding pure #hex handled separately) */
+const ARBITRARY_INNER_COMPLEX =
+  /[\s#(),'",/:]|_|var\(|calc\(|linear-gradient|url\(/i
+
+const isArbitraryPropertyClass = (token: string) => /^\[[^\]]+\]$/.test(token)
+
+const SMART_SIMPLE_INNER_RE =
+  /^[-+]?((\d+(\.\d+)?)|(\.\d+))([a-zA-Z%]{1,12})?$/
+
+/** `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` only — safe to emit as `text-#...` when stripping */
+const SIMPLE_HEX_ARBITRARY_INNER_RE =
+  /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/
+
+const isSimpleHexArbitraryInner = (inner: string) =>
+  SIMPLE_HEX_ARBITRARY_INNER_RE.test(inner)
+
+const innerAllowsNeverBracketRemoval = (inner: string) => {
+  if (inner.length === 0) {
+    return false
+  }
+  if (isSimpleHexArbitraryInner(inner)) {
+    return true
+  }
+  return !ARBITRARY_INNER_COMPLEX.test(inner)
+}
+
+const innerAllowsSmartBracketRemoval = (inner: string) =>
+  SMART_SIMPLE_INNER_RE.test(inner) || isSimpleHexArbitraryInner(inner)
+
+const transformUtilityArbitraryBrackets = (
+  token: string,
+  mode: 'always' | 'smart' | 'never' | undefined
+): string => {
+  const resolved = mode ?? 'always'
+  if (resolved === 'always' || !token) {
+    return token
+  }
+  if (isArbitraryPropertyClass(token)) {
+    return token
+  }
+  const m = /^(.+)-\[([^\]]+)\]$/.exec(token)
+  if (!m) {
+    return token
+  }
+  const [, prefix, inner] = m
+  if (resolved === 'smart') {
+    if (!innerAllowsSmartBracketRemoval(inner)) {
+      return token
+    }
+  } else if (resolved === 'never') {
+    if (!innerAllowsNeverBracketRemoval(inner)) {
+      return token
+    }
+  }
+  return `${prefix}-${inner}`
+}
+
+const applyArbitraryValueBrackets = (
+  pipeVal: string,
+  mode: TranslatorConfig['arbitraryValueBrackets']
+): string => {
+  const resolved = mode ?? 'always'
+  if (resolved === 'always' || !pipeVal) {
+    return pipeVal
+  }
+  return pipeVal
+    .split(/\s+/)
+    .map((t) => transformUtilityArbitraryBrackets(t, resolved))
+    .join(' ')
+}
+
 const moreDefaultMediaVals: Record<string, string> = {
   '@media(min-width:640px)': 'sm',
   '@media(min-width:768px)': 'md',
@@ -2153,6 +2249,7 @@ const getResultCode = (it: CssCodeParse, prefix = '', config: TranslatorConfig) 
         ? (config.customTheme[key.trim()]?.[val] || (config.useAllDefaultValues && moreDefaultValuesMap[key.trim()]?.[val]) || pipe(val))
         : (config.customTheme[key.trim()]?.[val] || (config.useAllDefaultValues && moreDefaultValuesMap[key.trim()]?.[val]) || (pipe?.[val] ?? ''))
     }
+    pipeVal = applyArbitraryValueBrackets(pipeVal, config.arbitraryValueBrackets)
     if ((config.prefix?.length ?? 0) > 0) {
       pipeVal = pipeVal.split(' ').map(v => `${v[0] === '-' ? '-' : ''}${config.prefix}${v.replace(/^-/, '')}`).join(' ')
     }
@@ -2249,6 +2346,12 @@ export interface TranslatorConfig {
    */
   useAllDefaultValues?: boolean
   customTheme?: CustomTheme
+  /**
+   * Controls optional outer `[...]` on arbitrary **value** utilities (e.g. `h-[28rpx]`).
+   * Arbitrary **property** classes like `[mask-type:luminance]` always keep brackets.
+   * @default 'always'
+   */
+  arbitraryValueBrackets?: 'always' | 'smart' | 'never'
 }
 
 export const defaultTranslatorConfig = {

@@ -12,6 +12,14 @@ interface ComputedResultCode {
   }[]
 }
 
+interface TranslatorConfig {
+  prefix?: string
+  useAllDefaultValues?: boolean
+  customTheme?: Record<string, Record<string, string>>
+  arbitraryValueBrackets?: 'always' | 'smart' | 'never'
+}
+
 interface TranslatorConfigCopy extends Omit<TranslatorConfig, 'customTheme'> {
   customTheme: string
+  wrapperTag: string
 }

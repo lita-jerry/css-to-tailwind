@@ -6,7 +6,7 @@ import SimpleBar from 'simplebar-react'
 import SvgDark from '@/assets/svg/dark.svg'
 import SvgGitHub from '@/assets/svg/github.svg'
 import SvgLight from '@/assets/svg/light.svg'
-import { copyText } from '@/utils/index'
+import { copyText, formatClassWithDomWrapper } from '@/utils/index'
 
 function ResultSection(props: {
   themeChange: () => void
@@ -27,11 +27,38 @@ function ResultSection(props: {
           <ul className={clsx('absolute left-1/2 -bottom-[16px] transform translate-y-full -translate-x-1/2 dark:border-[#454545] border-[#c8c8c8] border-solid border-[1px] dark:bg-[#1e1e1e] bg-[#f3f3f3] rounded-[8px] pt-[16px] px-[16px] pb-[8px] before:content-[""] before:w-[8px] before:h-[8px] before:bg-inherit before:block before:absolute before:-top-[4px] before:[border:inherit] before:!border-b-transparent before:!border-r-transparent before:left-1/2 before:transform before:-translate-x-1/2 before:rotate-45 [&>li]:mb-[8px]', configShow ? 'opacity-100' : 'opacity-0 pointer-events-none')}>
             <li className="flex items-center w-[300px]">
               <span>prefix:</span>
-              <input value={config.prefix} onChange={e => setConfig({ ...config, prefix: e.target.value })} type="text" className="w-[220px] ml-[8px] py-[2px] px-[4px] dark:bg-[#0f0f0f] bg-[#ffffff] rounded-[4px] text-inherit outline-none border-[1px] border-solid border-transparent dark:focus:border-[#f3f3f3] focus:border-[#454545]" />
+              <input value={config.prefix} onChange={e => setConfig(prev => ({ ...prev, prefix: e.target.value }))} type="text" className="w-[220px] ml-[8px] py-[2px] px-[4px] dark:bg-[#0f0f0f] bg-[#ffffff] rounded-[4px] text-inherit outline-none border-[1px] border-solid border-transparent dark:focus:border-[#f3f3f3] focus:border-[#454545]" />
             </li>
             <li className="flex items-center">
               <span>useAllDefaultValues:</span>
-              <input checked={config.useAllDefaultValues} onChange={e => setConfig({ ...config, useAllDefaultValues: e.target.checked })} type="checkbox" className="w-[20px] h-[20px] ml-[8px]" />
+              <input checked={config.useAllDefaultValues} onChange={e => setConfig(prev => ({ ...prev, useAllDefaultValues: e.target.checked }))} type="checkbox" className="w-[20px] h-[20px] ml-[8px]" />
+            </li>
+            <li className="flex flex-col w-[300px]">
+              <span className="mb-[4px]">arbitraryValueBrackets:</span>
+              <select
+                value={config.arbitraryValueBrackets ?? 'always'}
+                onChange={e =>
+                  setConfig(prev => ({
+                    ...prev,
+                    arbitraryValueBrackets: e.target.value as TranslatorConfig['arbitraryValueBrackets']
+                  }))
+                }
+                className="w-full py-[2px] px-[4px] dark:bg-[#0f0f0f] bg-[#ffffff] rounded-[4px] text-inherit outline-none border-[1px] border-solid border-transparent dark:focus:border-[#f3f3f3] focus:border-[#454545]"
+              >
+                <option value="always">always (keep h-[28rpx])</option>
+                <option value="smart">smart (simple lengths + plain #hex without [])</option>
+                <option value="never">never (strip [] when inner value is simple)</option>
+              </select>
+            </li>
+            <li className="flex items-center w-[300px] flex-wrap gap-y-[4px]">
+              <span className="shrink-0">wrapperTag:</span>
+              <input
+                value={config.wrapperTag ?? ''}
+                onChange={e => setConfig(prev => ({ ...prev, wrapperTag: e.target.value }))}
+                type="text"
+                placeholder="empty = class only; e.g. div"
+                className="min-w-0 flex-1 ml-[8px] py-[2px] px-[4px] dark:bg-[#0f0f0f] bg-[#ffffff] rounded-[4px] text-inherit outline-none border-[1px] border-solid border-transparent dark:focus:border-[#f3f3f3] focus:border-[#454545]"
+              />
             </li>
             <li className="flex flex-col">
               <span>customTheme:</span>
@@ -42,7 +69,7 @@ function ResultSection(props: {
                   height={300}
                   language="json"
                   theme={isDarkTheme ? 'vs-dark' : 'light'}
-                  onChange={v => setConfig({ ...config, customTheme: v ?? '' })}
+                  onChange={v => setConfig(prev => ({ ...prev, customTheme: v ?? '' }))}
                   defaultValue={config.customTheme}
                   options={{
                     fontSize: 18,
@@ -87,39 +114,51 @@ function ResultSection(props: {
           leaveAnimation="accordionVertical"
           duration={200}
         >
-          {computedResultVals.map((it) => (
-            <div key={it.id}>
-              <button
-                className="dark:bg-[#41454e] bg-[#f6f6f7] [border:1px_solid_rgba(60,60,67,.29)] dark:[border:1px_solid_#1e1e1e] p-[8px_16px] font-bold text-[18px] cursor-pointer filter hover:brightness-105 active:enabled:brightness-95 rounded-[4px]"
-                onClick={() => {
-                  copyText(it.resultVal.map(v => v.val).join(' '))
-                }}
-              >
-                Copy {it.selectorName} Result Code
-              </button>
-              <p className="text-[18px] leading-[30px] mb-[16px] mt-[8px]">
-                <span className="font-bold block mb-[8px]">
-                  {it.selectorName} Result Code:{' '}
-                </span>
-                <FlipMove
-                  className="dark:bg-[#1e1e1e] bg-[#e8e8e8] dark:text-[#b5cea8] text-[#098658] rounded-[2px] pt-[6px] pr-[10px] pl-[2px] inline-flex flex-wrap"
-                  typeName="span"
-                  enterAnimation="accordionHorizontal"
-                  leaveAnimation="accordionHorizontal"
-                  duration={200}
-                >
-                  {it.resultVal.map((v) => (
-                    <span
-                      className="ml-[8px] h-[22px] max-w-[90vw] lgx:max-w-[40vw] inline-block overflow-hidden text-ellipsis leading-[22px] mb-[6px] whitespace-nowrap"
-                      key={v.id}
-                    >
-                      {v.val}
-                    </span>
-                  ))}
-                </FlipMove>
-              </p>
-            </div>
-          ))}
+          {computedResultVals.map((it) => {
+            const joined = it.resultVal.map((v) => v.val).join(' ')
+            const displayText = formatClassWithDomWrapper(joined, config.wrapperTag)
+            const useWrappedLayout = displayText !== joined
+            return (
+              <div key={it.id}>
+                <p className="text-[18px] leading-[30px] mb-[16px] mt-[8px]">
+                  <span className="font-bold block mb-[8px]">
+                    {it.selectorName} Result Code <span className="font-normal text-[14px] opacity-80">(click to copy)</span>:
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Copy ${it.selectorName} result`}
+                    onClick={() => {
+                      copyText(displayText)
+                    }}
+                    className="cursor-pointer text-left w-full max-w-full rounded-[2px] border-0 p-0 filter hover:brightness-[1.02] active:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#1e1e1e]"
+                  >
+                    {useWrappedLayout ? (
+                      <code className="block dark:bg-[#1e1e1e] bg-[#e8e8e8] dark:text-[#b5cea8] text-[#098658] rounded-[2px] pt-[6px] pr-[10px] pb-[6px] pl-[10px] text-[16px] leading-relaxed break-all whitespace-pre-wrap">
+                        {displayText}
+                      </code>
+                    ) : (
+                      <FlipMove
+                        className="dark:bg-[#1e1e1e] bg-[#e8e8e8] dark:text-[#b5cea8] text-[#098658] rounded-[2px] pt-[6px] pr-[10px] pl-[2px] inline-flex flex-wrap"
+                        typeName="span"
+                        enterAnimation="accordionHorizontal"
+                        leaveAnimation="accordionHorizontal"
+                        duration={200}
+                      >
+                        {it.resultVal.map((v) => (
+                          <span
+                            className="ml-[8px] h-[22px] max-w-[90vw] lgx:max-w-[40vw] inline-block overflow-hidden text-ellipsis leading-[22px] mb-[6px] whitespace-nowrap"
+                            key={v.id}
+                          >
+                            {v.val}
+                          </span>
+                        ))}
+                      </FlipMove>
+                    )}
+                  </button>
+                </p>
+              </div>
+            )
+          })}
         </FlipMove>
       </SimpleBar>
     </section>

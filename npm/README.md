@@ -53,6 +53,7 @@ console.log(conversionResult);
 |       `prefix`        | [tailwind configuration prefix](https://tailwindcss.com/docs/configuration#prefix) |           string            |
 | `useAllDefaultValues` |                Use tailwind all default values(The default is true)                |           boolean           |
 |     `customTheme`     |                    Custom conversion of preset property values                     | [CustomTheme](#customtheme) |
+| `arbitraryValueBrackets` | How to format arbitrary **value** utilities like `h-[28rpx]`: `always` keeps brackets (default); `smart` drops brackets for simple numeric or numeric+unit atoms and for **plain hex** inner values (`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` only, e.g. `text-#3F16FF`); `never` also allows plain hex; other values with spaces, parentheses, `/`, non-hex `#`, `var(`, `calc(`, gradients, URLs, etc. keep `[]`. Arbitrary **property** classes like `[animation-delay:1s]` never lose their bracket form. | `'always' \| 'smart' \| 'never'` |
 
 ### `CustomTheme`
 

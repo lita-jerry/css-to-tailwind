@@ -1,13 +1,20 @@
 import Editor from '@monaco-editor/react'
-import {
-  CssToTailwindTranslator,
-  specialAttribute,
-  defaultTranslatorConfig
-} from 'css-to-tailwind-translator'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import ResultSection from '@/components/ResultSection'
-import { getDemoArray, toast } from '@/utils/index'
+import {
+  CssToTailwindTranslator,
+  defaultTranslatorConfig,
+  specialAttribute
+} from '@/npm/CssToTailwindTranslator'
+import { getDemoArray, normalizeCssInputForTranslator, toast } from '@/utils/index'
+
+const DEFAULT_TRANSLATOR_PAGE_CONFIG: TranslatorConfigCopy = {
+  ...defaultTranslatorConfig,
+  customTheme: '{\n  "box-shadow": {\n    "10px 10px 5px #888888": "box-shadow-custom"\n  }\n}',
+  arbitraryValueBrackets: 'always',
+  wrapperTag: ''
+}
 
 let windowClick: (() => void) | null
 const ePreventDefault = (e: KeyboardEvent) => {
@@ -23,9 +30,7 @@ export default function Home() {
   const [cssCode, setCssCode] = useState<string>('')
   const [resultVals, setResultVals] = useState<ResultCode[]>([])
   const [demoEnded, setDemoEnded] = useState<boolean>(true)
-  const [config, setConfig] = useState<TranslatorConfigCopy>(
-    { ...defaultTranslatorConfig, customTheme: '{\n  "box-shadow": {\n    "10px 10px 5px #888888": "box-shadow-custom"\n  }\n}' }
-  )
+  const [config, setConfig] = useState<TranslatorConfigCopy>(DEFAULT_TRANSLATOR_PAGE_CONFIG)
   const demoStringKey = useRef<string[]>(demoArray)
 
   const [computedResultVals, setComputedResultVals] = useState<
@@ -76,11 +81,22 @@ export default function Home() {
   }
 
   useEffect(() => {
-    let customTheme
+    let customTheme: Record<string, Record<string, string>> = {}
     try {
-      customTheme = JSON.parse(config.customTheme.trim())
+      customTheme = JSON.parse(config.customTheme.trim()) as Record<
+        string,
+        Record<string, string>
+      >
     } catch (error) { /* empty */ }
-    const result = CssToTailwindTranslator(cssCode, { ...config, customTheme })
+    const result = CssToTailwindTranslator(
+      normalizeCssInputForTranslator(cssCode),
+      {
+        prefix: config.prefix,
+        useAllDefaultValues: config.useAllDefaultValues,
+        arbitraryValueBrackets: config.arbitraryValueBrackets,
+        customTheme
+      }
+    )
     if (result.code === 'SyntaxError') {
       toast.error(
         `[${specialAttribute.join(', ')}] syntax does not support conversion`,
@@ -161,7 +177,23 @@ export default function Home() {
   useEffect(() => {
     setIsDarkTheme((localStorage.theme ?? 'dark') === 'dark')
     const c = localStorage.getItem('translator-config')
-    c && setConfig(JSON.parse(c))
+    if (c) {
+      try {
+        const parsed = JSON.parse(c) as Partial<TranslatorConfigCopy>
+        setConfig({
+          ...DEFAULT_TRANSLATOR_PAGE_CONFIG,
+          ...parsed,
+          wrapperTag:
+            typeof parsed.wrapperTag === 'string'
+              ? parsed.wrapperTag
+              : DEFAULT_TRANSLATOR_PAGE_CONFIG.wrapperTag,
+          arbitraryValueBrackets:
+            parsed.arbitraryValueBrackets ?? DEFAULT_TRANSLATOR_PAGE_CONFIG.arbitraryValueBrackets
+        })
+      } catch {
+        /* ignore invalid stored config */
+      }
+    }
   }, [])
 
   useEffect(() => {
